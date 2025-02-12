@@ -10,10 +10,6 @@ const KakaoLogoutButton = () => {
   const handleLogout = async () => {
     if (session?.user?.accessToken) {
       try {
-        // 1. next-auth signOut() 먼저 호출하여 클라이언트 세션 제거
-        await signOut({ redirect: false }); // redirect: false를 사용하여 페이지 리디렉션 방지
-
-        // 2. (선택 사항) 카카오 로그아웃 API 호출 (사용자 경험 개선)
         const response = await fetch(`/api/auth/kakao-logout`, {
           method: "POST",
           body: JSON.stringify({ accessToken: session.user.accessToken }),
@@ -25,10 +21,11 @@ const KakaoLogoutButton = () => {
         }
 
         console.log(response);
+
+        await signOut();
       } catch (error) {
         console.error("서버 Kakao 로그아웃 API 호출 에러:", error);
       } finally {
-        // 3. 로그아웃 후 홈페이지("/") 또는 로그인 페이지로 리디렉션 (선택 사항)
         router.push("/"); // 로그아웃 후 홈페이지로 이동 (원하는 페이지로 변경 가능)
       }
     }

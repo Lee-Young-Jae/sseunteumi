@@ -7,26 +7,26 @@ export default function LandingPage() {
       <section className="max-w-3xl text-center overflow-hidden">
         <h1 className="flex flex-wrap justify-center text-4xl leading-[140%] font-bold gap-2">
           <span
-            className="text-text-secondary inline-block animate-slide-in opacity-0"
+            className="text-text-gray01 inline-block animate-slide-in opacity-0"
             style={{ animationDelay: "0s" }}
           >
             소중한
           </span>
           <span
-            className="text-text-secondary inline-block animate-slide-in opacity-0"
+            className="text-text-gray01 inline-block animate-slide-in opacity-0"
             style={{ animationDelay: "0.1s" }}
           >
             재정,
           </span>
           <span className="basis-full h-0"></span>
           <span
-            className="text-text-secondary inline-block animate-slide-in opacity-0"
+            className="text-text-gray01 inline-block animate-slide-in opacity-0"
             style={{ animationDelay: "0.2s" }}
           >
             기록하고
           </span>
           <span
-            className="text-text-secondary inline-block animate-slide-in opacity-0"
+            className="text-text-gray01 inline-block animate-slide-in opacity-0"
             style={{ animationDelay: "0.3s" }}
           >
             관리하는
