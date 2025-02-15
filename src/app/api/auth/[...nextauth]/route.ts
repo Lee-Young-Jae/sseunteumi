@@ -22,6 +22,11 @@ export const authOptions: NextAuthOptions = {
     KakaoProvider({
       clientId: process.env.KAKAO_CLIENT_ID!,
       clientSecret: process.env.KAKAO_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          prompt: "login",
+        },
+      },
     }),
   ],
   // JWT와 세션에 사용자 정보를 담기 위한 콜백
