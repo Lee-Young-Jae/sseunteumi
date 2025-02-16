@@ -1,23 +1,53 @@
-// app/api/auth/[...nextauth]/route.ts
 import NextAuth, { NextAuthOptions, Session } from "next-auth";
 import KakaoProvider from "next-auth/providers/kakao";
-import { JWT } from "next-auth/jwt";
+// import { JWT } from "next-auth/jwt";
+import { supabaseAdmin } from "@/app/lib/supabaseAdminClient";
 
 interface KakaoProfile {
   id: number;
-  connected_at: string;
   properties: {
     nickname: string;
     profile_image: string;
     thumbnail_image: string;
   };
+  kakao_account: {
+    profile: {
+      nickname: string;
+      profile_image_url: string;
+      thumbnail_image_url: string;
+    };
+  };
+}
+
+// JWT 토큰 타입 확장
+declare module "next-auth/jwt" {
+  interface JWT {
+    accessToken?: string;
+    profile_image?: string;
+    thumbnail_image_url?: string;
+    id?: string;
+  }
+}
+
+// 세션 타입 확장
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      name?: string | null;
+      email?: string | null;
+      image?: string | null;
+      profile_image?: string;
+      thumbnail_image_url?: string;
+      accessToken: string;
+    };
+  }
 }
 
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
-  // 카카오 OAuth 인증만 사용
   providers: [
     KakaoProvider({
       clientId: process.env.KAKAO_CLIENT_ID!,
@@ -32,7 +62,6 @@ export const authOptions: NextAuthOptions = {
   // JWT와 세션에 사용자 정보를 담기 위한 콜백
   callbacks: {
     async jwt({ token, account, profile }) {
-      // 최초 로그인 시 account와 profile이 전달됨
       if (account && profile) {
         const kakaoProfile = profile as KakaoProfile;
         token.accessToken = account.access_token;
@@ -42,15 +71,9 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
-    // 세션 생성 시 호출되는 콜백
-    async session({
-      session,
-      token,
-    }: {
-      session: Session;
-      token: JWT;
-    }): Promise<Session> {
+    async session({ session, token }): Promise<Session> {
       // 클라이언트에서 session.user를 통해 사용자 정보에 접근할 수 있도록 함
+      console.log({ session });
       session.user.profile_image = token.profile_image;
       session.user.thumbnail_image_url = token.thumbnail_image_url;
       session.user.id = token.id!;
@@ -58,7 +81,31 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  // 로그인 페이지 경로 지정 (랜딩페이지를 로그인 페이지로 사용)
+  // 로그인 이벤트가 발생할 때, Supabase DB에 유저 정보를 삽입(또는 업데이트)하도록 이벤트 핸들러 추가
+  events: {
+    async signIn({ user, account, profile, isNewUser }) {
+      try {
+        const kakaoProfile = profile as any;
+        const { error } = await supabaseAdmin.from("users").upsert(
+          {
+            id: String(user.id),
+            name: kakaoProfile.name,
+            image: kakaoProfile.image,
+          },
+          { onConflict: "id" }
+        );
+
+        if (error) {
+          console.error("Error upserting user into Supabase:", error);
+        } else {
+          console.log("User successfully upserted into Supabase");
+        }
+      } catch (err) {
+        console.error("Error in signIn event callback:", err);
+      }
+    },
+  },
+  // 로그인 페이지 경로 지정 (예: 랜딩페이지)
   pages: {
     signIn: "/",
   },

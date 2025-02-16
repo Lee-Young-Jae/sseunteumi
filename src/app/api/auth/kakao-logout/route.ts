@@ -1,23 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../[...nextauth]/route";
 
-export async function POST(request: NextRequest) {
+export async function GET() {
   try {
-    const { accessToken } = await request.json();
+    const session = await getServerSession(authOptions);
 
-    if (!accessToken) {
+    if (!session) {
       return NextResponse.json(
         { message: "액세스 토큰이 없습니다." },
         { status: 401 }
       );
     }
 
-    const url = `https://kauth.kakao.com/oauth/logout?client_id=${process.env.KAKAO_CLIENT_ID}&logout_redirect_uri=${process.env.KAKAO_LOGOUT_REDIRECT_URI}`;
+    const url = `https://kapi.kakao.com/v1/user/logout`;
 
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        // Authorization: `Bearer ${accessToken}`,
-        // "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Bearer ${session.user.accessToken}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
     });
 

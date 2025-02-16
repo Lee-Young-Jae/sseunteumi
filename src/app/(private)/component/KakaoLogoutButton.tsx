@@ -10,23 +10,19 @@ const KakaoLogoutButton = () => {
   const handleLogout = async () => {
     if (session?.user?.accessToken) {
       try {
-        const response = await fetch(`/api/auth/kakao-logout`, {
-          method: "POST",
-          body: JSON.stringify({ accessToken: session.user.accessToken }),
-        });
+        const response = await fetch(`/api/auth/kakao-logout`);
 
         if (!response.ok) {
           console.error("카카오 로그아웃 실패");
           return;
         }
 
-        console.log(response);
-
-        await signOut();
+        await signOut({
+          redirect: true,
+          callbackUrl: "/",
+        });
       } catch (error) {
         console.error("서버 Kakao 로그아웃 API 호출 에러:", error);
-      } finally {
-        router.push("/"); // 로그아웃 후 홈페이지로 이동 (원하는 페이지로 변경 가능)
       }
     }
   };
