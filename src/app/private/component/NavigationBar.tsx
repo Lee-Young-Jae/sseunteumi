@@ -12,11 +12,11 @@ const NavigationBar = () => {
   const pathname = usePathname();
 
   const icons = {
-    "/main": AiOutlineHome,
-    "/calendar": LuCalendarDays,
-    "/dashboard": LuLayoutDashboard,
-    "/statistics": IoStatsChartOutline,
-    "/settings": IoSettingsOutline,
+    "/private/main": AiOutlineHome,
+    "/private/calendar": LuCalendarDays,
+    "/private/dashboard": LuLayoutDashboard,
+    "/private/statistics": IoStatsChartOutline,
+    "/private/settings": IoSettingsOutline,
   };
 
   const handleNavigation = (path: string) => {

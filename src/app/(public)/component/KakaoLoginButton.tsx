@@ -11,7 +11,7 @@ export default function KakaoLoginButton() {
   // 이미 로그인된 상태면 /main 페이지로 리다이렉트
   useEffect(() => {
     if (status === "authenticated") {
-      router.push("/main");
+      router.push("/private/main");
     }
   }, [status, router]);
 
@@ -21,7 +21,7 @@ export default function KakaoLoginButton() {
       await signIn("kakao", { redirect: false, force: true });
     } else {
       // 로그인된 상태면 바로 /main으로 이동
-      router.push("/main");
+      router.push("/private/main");
     }
   };
 

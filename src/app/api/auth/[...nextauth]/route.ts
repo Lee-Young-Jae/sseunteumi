@@ -73,7 +73,6 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }): Promise<Session> {
       // 클라이언트에서 session.user를 통해 사용자 정보에 접근할 수 있도록 함
-      console.log({ session });
       session.user.profile_image = token.profile_image;
       session.user.thumbnail_image_url = token.thumbnail_image_url;
       session.user.id = token.id!;
@@ -83,22 +82,36 @@ export const authOptions: NextAuthOptions = {
   },
   // 로그인 이벤트가 발생할 때, Supabase DB에 유저 정보를 삽입(또는 업데이트)하도록 이벤트 핸들러 추가
   events: {
-    async signIn({ user, account, profile, isNewUser }) {
+    async signIn({ user, account, profile }) {
       try {
-        const kakaoProfile = profile as any;
-        const { error } = await supabaseAdmin.from("users").upsert(
-          {
-            id: String(user.id),
-            name: kakaoProfile.name,
-            image: kakaoProfile.image,
-          },
-          { onConflict: "id" }
-        );
+        const kakaoProfile = profile as KakaoProfile;
 
-        if (error) {
-          console.error("Error upserting user into Supabase:", error);
-        } else {
-          console.log("User successfully upserted into Supabase");
+        // 먼저 현재 DB의 유저 정보를 조회
+        const { data: existingUser } = await supabaseAdmin
+          .from("users")
+          .select("*")
+          .eq("id", String(kakaoProfile.id))
+          .single();
+
+        // 이미지가 변경되었거나 새로운 유저인 경우 업데이트
+        if (
+          !existingUser ||
+          existingUser.image !== kakaoProfile.properties.profile_image
+        ) {
+          const { error } = await supabaseAdmin.from("users").upsert(
+            {
+              id: String(kakaoProfile.id),
+              name: kakaoProfile.properties.nickname,
+              image: kakaoProfile.properties.profile_image,
+            },
+            { onConflict: "id" }
+          );
+
+          if (error) {
+            console.error("Error upserting user into Supabase:", error);
+          } else {
+            console.log("User successfully upserted into Supabase");
+          }
         }
       } catch (err) {
         console.error("Error in signIn event callback:", err);
