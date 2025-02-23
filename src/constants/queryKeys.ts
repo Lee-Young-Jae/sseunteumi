@@ -1,12 +1,13 @@
 export const queryKeys = {
-  EXPENSE: {
-    all: ["expense"] as const,
-    list: () => [...queryKeys.EXPENSE.all, "list"] as const,
-    detail: (id: string) => [...queryKeys.EXPENSE.all, "detail", id] as const,
+  TRANSACTION: {
+    all: ["transaction"] as const,
+    list: () => [...queryKeys.TRANSACTION.all, "list"] as const,
+    detail: (id: string) =>
+      [...queryKeys.TRANSACTION.all, "detail", id] as const,
+    monthly: (year: number, month: number) =>
+      [...queryKeys.TRANSACTION.all, "monthly", year, month] as const,
   },
-  INCOME: {
-    all: ["income"] as const,
-    list: () => [...queryKeys.INCOME.all, "list"] as const,
-    detail: (id: string) => [...queryKeys.INCOME.all, "detail", id] as const,
+  CATEGORY: {
+    all: ["category"] as const,
   },
 } as const;

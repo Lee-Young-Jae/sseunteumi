@@ -39,8 +39,17 @@ import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { format, isToday } from "date-fns";
 import { ko } from "date-fns/locale";
-import { useGetExpenses } from "@/queries/useExpenseQuery";
-import { useCreateExpense } from "@/queries/useExpenseQuery";
+import {
+  useGetCategories,
+  useCreateCategory,
+  useUpdateCategory,
+  useDeactivateCategory,
+} from "@/queries/useCategoryQuery";
+import { motion } from "framer-motion";
+import {
+  useCreateTransaction,
+  useGetMonthlyTransactions,
+} from "@/queries/useTransactionQuery";
 
 interface Category {
   id: string;
@@ -48,18 +57,7 @@ interface Category {
   color: string;
 }
 
-interface ExpenseItem {
-  id: string;
-  amount: number;
-  categoryId: string;
-  description?: string;
-  date: Date;
-}
-
 const formSchema = z.object({
-  amount: z.string().min(1, "금액을 입력해주세요"),
-  category: z.string().min(1, "카테고리를 선택해주세요"),
-  description: z.string().optional(),
   date: z.date(),
   items: z.array(
     z.object({
@@ -72,22 +70,16 @@ const formSchema = z.object({
 
 const MainPage = () => {
   const { data: session } = useSession();
-  const [categories, setCategories] = useState<Category[]>([
-    { id: "1", name: "식비", color: "#FF6B6B" },
-    { id: "2", name: "교통", color: "#4ECDC4" },
-    { id: "3", name: "주거", color: "#45B7D1" },
-    { id: "4", name: "통신", color: "#96CEB4" },
-    { id: "5", name: "의료", color: "#FFEEAD" },
-    { id: "6", name: "교육", color: "#D4A5A5" },
-    { id: "7", name: "여가", color: "#9B59B6" },
-    { id: "8", name: "기타", color: "#95A5A6" },
-  ]);
-  const [newCategory, setNewCategory] = useState({
-    name: "",
-    color: "#000000",
-  });
-  const { data: expenses } = useGetExpenses();
-  const createExpense = useCreateExpense();
+  const { data: categories = [], isLoading: isCategoriesLoading } =
+    useGetCategories();
+
+  const { data: transactionData, isLoading: isTransactionsLoading } =
+    useGetMonthlyTransactions();
+
+  const createTransaction = useCreateTransaction();
+  const createCategory = useCreateCategory();
+  const updateCategory = useUpdateCategory();
+  const deactiveCategory = useDeactivateCategory();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -108,28 +100,46 @@ const MainPage = () => {
     name: "items",
   });
 
-  const addCategory = () => {
+  const [newCategory, setNewCategory] = useState({
+    name: "",
+    color: "#000000",
+  });
+
+  const addCategory = async () => {
     if (newCategory.name.trim()) {
-      setCategories([
-        ...categories,
-        {
-          id: Date.now().toString(),
+      try {
+        await createCategory.mutateAsync({
           name: newCategory.name,
           color: newCategory.color,
-        },
-      ]);
-      setNewCategory({ name: "", color: "#000000" });
+        });
+        setNewCategory({ name: "", color: "#000000" });
+      } catch (error) {
+        console.error("카테고리 생성 중 오류:", error);
+      }
     }
   };
 
-  const removeCategory = (id: string) => {
-    setCategories(categories.filter((cat) => cat.id !== id));
+  const removeCategory = async (id: string) => {
+    try {
+      await deactiveCategory.mutateAsync(id);
+    } catch (error) {
+      console.error("카테고리 삭제 중 오류:", error);
+    }
   };
 
-  const updateCategoryColor = (id: string, color: string) => {
-    setCategories(
-      categories.map((cat) => (cat.id === id ? { ...cat, color: color } : cat))
-    );
+  const updateCategoryColor = async (id: string, color: string) => {
+    try {
+      const category = categories?.find((c: Category) => c.id === id);
+      if (category) {
+        await updateCategory.mutateAsync({
+          id,
+          name: category.name,
+          color,
+        });
+      }
+    } catch (error) {
+      console.error("카테고리 수정 중 오류:", error);
+    }
   };
 
   // 금액 포맷팅 함수 추가
@@ -152,10 +162,12 @@ const MainPage = () => {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       for (const item of values.items) {
-        await createExpense.mutateAsync({
+        await createTransaction.mutateAsync({
           amount: Number(item.amount),
-          category: item.categoryId,
-          description: item.description,
+          categories_id: item.categoryId,
+          description: item.description || "",
+          transaction_date: values.date,
+          type: "expense",
         });
       }
 
@@ -166,136 +178,93 @@ const MainPage = () => {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-4xl">
-      <header className="mb-8">
+    <motion.main
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="container mx-auto px-4 py-8 max-w-4xl"
+    >
+      <motion.header
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="mb-8 bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-2xl"
+      >
         <h1 className="text-2xl font-bold text-gray-800">
-          <span className="text-blue-600">{session?.user?.name}님</span>{" "}
-          반가워요! 😁
+          <span className="text-blue-600">{session?.user?.name}님</span>의 지출
+          관리
         </h1>
-      </header>
-      <section className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white">
-            <span className="block text-gray-600 text-lg mb-2">
-              이번달 지출
+        <p className="text-gray-600 mt-1 text-sm">
+          오늘도 현명한 소비하세요! 💰
+        </p>
+      </motion.header>
+      <motion.section
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="space-y-6"
+      >
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+        >
+          <div className="bg-white p-4 rounded-2xl border-2 border-gray-100 hover:border-blue-200 transition-colors">
+            <span className="block text-gray-600 text-sm mb-2">
+              이번달 총 지출
             </span>
-            <span className="block text-3xl font-bold text-blue-600">
-              100,000원
+            <span className="block text-2xl font-bold text-blue-600">
+              {transactionData?.expenseTotal
+                ? transactionData.expenseTotal.toLocaleString()
+                : 0}
+              원
             </span>
           </div>
-        </div>
 
-        <div className="rounded-xl bg-blue-50 p-6 border border-blue-100">
-          <p className="text-gray-600">
-            이번달엔{" "}
-            <span className="text-blue-600 font-semibold">{`${categories[0].name}`}</span>
-            에 제일 많이 썼네요.
-          </p>
-        </div>
+          {
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white">
+              <h3 className="text-sm font-medium mb-1">이번달 최다 지출</h3>
+              {transactionData?.topCategory && (
+                <p className="text-xl font-bold">
+                  {transactionData.topCategory.name || ""}
+                  <span className="text-blue-200 text-sm ml-2">카테고리</span>
+                </p>
+              )}
+            </div>
+          }
+        </motion.div>
 
-        <section className="bg-white rounded-3xl">
-          <div className="flex justify-between items-center mb-10">
-            <h2 className="text-2xl font-bold text-gray-900">
-              지출을 추가할래요.
-            </h2>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="rounded-xl hover:bg-gray-100"
-                >
-                  <Settings2 className="h-5 w-5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>카테고리 관리</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="새 카테고리"
-                      value={newCategory.name}
-                      onChange={(e) =>
-                        setNewCategory({ ...newCategory, name: e.target.value })
-                      }
-                      className="flex-1"
-                    />
-                    <Input
-                      type="color"
-                      value={newCategory.color}
-                      onChange={(e) =>
-                        setNewCategory({
-                          ...newCategory,
-                          color: e.target.value,
-                        })
-                      }
-                      className="w-20"
-                    />
-                    <Button onClick={addCategory} size="icon">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="space-y-2">
-                    {categories.map((category) => (
-                      <div
-                        key={category.id}
-                        className="flex items-center justify-between p-2 rounded bg-gray-50"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-4 h-4 rounded"
-                            style={{ backgroundColor: category.color }}
-                          />
-                          <span>{category.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="color"
-                            value={category.color}
-                            onChange={(e) =>
-                              updateCategoryColor(category.id, e.target.value)
-                            }
-                            className="w-12 h-8"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeCategory(category.id)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
+        <motion.section
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="bg-white rounded-3xl"
+        >
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">
+                지출을 추가할까요?
+              </h2>
               <FormField
                 control={form.control}
                 name="date"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
+                  <FormItem className="">
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
                             variant={"outline"}
                             className={cn(
-                              "w-full pl-3 text-left font-normal h-14 text-lg rounded-2xl border-2 hover:bg-gray-50",
+                              "max-w-[200px] text-left font-normal h-10 text-sm hover:bg-gray-50 border-none bg-transparent shadow-none",
                               !field.value && "text-muted-foreground"
                             )}
                           >
                             {field.value ? (
                               isToday(field.value) ? (
-                                "오늘"
+                                <span className="text-blue-600 font-medium">
+                                  오늘
+                                </span>
                               ) : (
                                 format(field.value, "PPP", { locale: ko })
                               )
@@ -315,16 +284,21 @@ const MainPage = () => {
                         />
                       </PopoverContent>
                     </Popover>
-                    <FormMessage className="text-red-500 text-base mt-2" />
+                    <FormMessage className="text-red-500 text-sm mt-1" />
                   </FormItem>
                 )}
               />
+            </div>
 
-              <div className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="space-y-4">
                 {fields.map((field, index) => (
-                  <div
+                  <motion.div
                     key={field.id}
-                    className="p-6 rounded-2xl bg-gray-50 relative border-2 border-gray-100"
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="p-6 rounded-2xl bg-gradient-to-br from-white to-gray-50 relative border border-gray-200 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow-md"
                   >
                     <div className="absolute right-4 top-4">
                       {index > 0 && (
@@ -340,7 +314,7 @@ const MainPage = () => {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-6">
                       <FormField
                         control={form.control}
                         name={`items.${index}.amount`}
@@ -350,18 +324,39 @@ const MainPage = () => {
                               금액
                             </FormLabel>
                             <FormControl>
-                              <div className="relative">
-                                <Input
-                                  placeholder="0"
-                                  value={formatAmount(field.value)}
-                                  onChange={(e) =>
-                                    handleAmountChange(e, field.onChange)
-                                  }
-                                  className="text-right text-xl h-14 rounded-2xl border-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 pr-12"
-                                />
-                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">
-                                  원
-                                </span>
+                              <div className="space-y-3">
+                                <div className="relative">
+                                  <Input
+                                    placeholder="0"
+                                    value={formatAmount(field.value)}
+                                    onChange={(e) =>
+                                      handleAmountChange(e, field.onChange)
+                                    }
+                                    className="text-right text-xl h-11 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 pr-12 bg-white transition-all"
+                                  />
+                                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-lg">
+                                    원
+                                  </span>
+                                </div>
+                                <div className="flex gap-2 mt-2">
+                                  {[1000, 5000, 10000].map((amount) => (
+                                    <button
+                                      key={amount}
+                                      type="button"
+                                      onClick={() => {
+                                        const currentAmount = Number(
+                                          field.value.replace(/,/g, "") || 0
+                                        );
+                                        field.onChange(
+                                          (currentAmount + amount).toString()
+                                        );
+                                      }}
+                                      className="px-3 py-1.5 text-sm rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100"
+                                    >
+                                      +{amount.toLocaleString()}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             </FormControl>
                             <FormMessage className="text-red-500 text-base mt-2" />
@@ -377,38 +372,144 @@ const MainPage = () => {
                             <FormLabel className="text-base font-semibold text-gray-900 mb-2 block">
                               카테고리
                             </FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger className="h-14 rounded-2xl border-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-                                  <SelectValue
-                                    placeholder="카테고리 선택"
-                                    className="text-lg"
-                                  />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent className="rounded-2xl">
-                                {categories.map((category) => (
-                                  <SelectItem
-                                    key={category.id}
-                                    value={category.id}
-                                    className="hover:bg-blue-50"
+                            <div className="flex gap-2">
+                              <Select
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-11 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-white">
+                                    <SelectValue
+                                      placeholder="카테고리 선택"
+                                      className="text-base"
+                                    />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent className="rounded-2xl">
+                                  {categories?.map((category) => (
+                                    <SelectItem
+                                      key={category.id}
+                                      value={category.id}
+                                      className="hover:bg-blue-50"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <div
+                                          className="w-3 h-3 rounded-full"
+                                          style={{
+                                            backgroundColor: category.color,
+                                          }}
+                                        />
+                                        {category.name}
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-11 w-11 rounded-xl border border-gray-200 hover:border-blue-500 hover:bg-blue-50"
                                   >
-                                    <div className="flex items-center gap-2">
-                                      <div
-                                        className="w-3 h-3 rounded"
-                                        style={{
-                                          backgroundColor: category.color,
-                                        }}
+                                    <Settings2 className="h-4 w-4 text-gray-500" />
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[425px] rounded-3xl p-6">
+                                  <DialogHeader>
+                                    <DialogTitle className="text-2xl font-bold">
+                                      카테고리 관리
+                                    </DialogTitle>
+                                  </DialogHeader>
+                                  <div className="space-y-6 py-4">
+                                    <div className="flex gap-2">
+                                      <div className="flex-1 relative">
+                                        <Input
+                                          placeholder="새 카테고리 이름"
+                                          value={newCategory.name}
+                                          onChange={(e) =>
+                                            setNewCategory({
+                                              ...newCategory,
+                                              name: e.target.value,
+                                            })
+                                          }
+                                          className="h-12 pl-12 rounded-2xl border-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-base"
+                                        />
+                                        <div
+                                          className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 rounded"
+                                          style={{
+                                            backgroundColor: newCategory.color,
+                                          }}
+                                        />
+                                      </div>
+                                      <Input
+                                        type="color"
+                                        value={newCategory.color}
+                                        onChange={(e) =>
+                                          setNewCategory({
+                                            ...newCategory,
+                                            color: e.target.value,
+                                          })
+                                        }
+                                        className="w-12 h-12 p-1 rounded-2xl border-2"
                                       />
-                                      {category.name}
+                                      <Button
+                                        onClick={addCategory}
+                                        size="icon"
+                                        className="h-12 w-12 rounded-2xl bg-blue-600 hover:bg-blue-700"
+                                      >
+                                        <Plus className="h-5 w-5" />
+                                      </Button>
                                     </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+
+                                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                                      {categories?.map((category) => (
+                                        <div
+                                          key={category.id}
+                                          className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <div
+                                              className="w-5 h-5 rounded-lg"
+                                              style={{
+                                                backgroundColor: category.color,
+                                              }}
+                                            />
+                                            <span className="font-medium text-gray-900">
+                                              {category.name}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <Input
+                                              type="color"
+                                              value={category.color}
+                                              onChange={(e) =>
+                                                updateCategoryColor(
+                                                  category.id,
+                                                  e.target.value
+                                                )
+                                              }
+                                              className="w-10 h-10 p-1 rounded-xl border-2"
+                                            />
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              onClick={() =>
+                                                removeCategory(category.id)
+                                              }
+                                              className="h-10 w-10 rounded-xl text-gray-500 hover:text-red-600 hover:bg-red-50"
+                                            >
+                                              <X className="h-4 w-4" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                            </div>
                             <FormMessage className="text-red-500 text-base mt-2" />
                           </FormItem>
                         )}
@@ -427,44 +528,54 @@ const MainPage = () => {
                             <Input
                               placeholder="지출에 대한 설명을 입력해주세요"
                               {...field}
-                              className="h-14 rounded-2xl border-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-lg"
+                              className="h-11 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-base"
                             />
                           </FormControl>
                           <FormMessage className="text-red-500 text-base mt-2" />
                         </FormItem>
                       )}
                     />
-                  </div>
+                  </motion.div>
                 ))}
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-14 rounded-2xl text-lg font-semibold border-2 border-gray-200 hover:bg-gray-50"
-                  onClick={() =>
-                    append({
-                      amount: "",
-                      categoryId: "",
-                      description: "",
-                    })
-                  }
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <Plus className="mr-2 h-5 w-5" />
-                  지출 항목 추가
-                </Button>
-              </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-10 rounded-lg text-sm font-medium border border-blue-200 text-blue-600 hover:bg-blue-50"
+                    onClick={() =>
+                      append({
+                        amount: "",
+                        categoryId: "",
+                        description: "",
+                      })
+                    }
+                  >
+                    <Plus className="mr-1 h-4 w-4" />
+                    지출 항목 추가
+                  </Button>
+                </motion.div>
 
-              <Button
-                type="submit"
-                className="w-full h-14 text-lg font-semibold bg-blue-600 hover:bg-blue-700 rounded-2xl transition-colors"
-              >
-                저장하기
-              </Button>
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button
+                    type="submit"
+                    className="w-full h-11 text-base font-medium bg-blue-600 hover:bg-blue-700 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    저장하기
+                  </Button>
+                </motion.div>
+              </div>
             </form>
           </Form>
-        </section>
-      </section>
-    </main>
+        </motion.section>
+      </motion.section>
+    </motion.main>
   );
 };
 

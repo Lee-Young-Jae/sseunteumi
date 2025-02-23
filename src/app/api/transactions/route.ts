@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const year = searchParams.get("year");
 
     let query = supabaseAdmin
-      .from("expenses")
+      .from("transactions")
       .select(
         `
         *,
@@ -36,28 +36,41 @@ export async function GET(request: Request) {
         parseInt(month),
         0
       ).toISOString();
-      query = query.gte("expense_date", startDate).lte("expense_date", endDate);
+      query = query
+        .gte("transaction_date", startDate)
+        .lte("transaction_date", endDate);
     }
 
-    const { data: expenses, error } = await query.order("expense_date", {
-      ascending: false,
-    });
+    const { data: transactions, error } = await query.order(
+      "transaction_date",
+      {
+        ascending: false,
+      }
+    );
 
     if (error) throw error;
 
-    // 카테고리별 총액 계산
-    const categoryTotals = expenses.reduce((acc: any, expense) => {
-      const categoryId = expense.categories_id;
-      if (!acc[categoryId]) {
-        acc[categoryId] = {
-          total: 0,
-          name: expense.categories?.name,
-          color: expense.categories?.color,
-        };
-      }
-      acc[categoryId].total += expense.amount;
-      return acc;
-    }, {});
+    // 지출 항목만 필터링하여 카테고리별 총액 계산
+    const expenseTransactions = transactions.filter(
+      (t) => t.type === "expense"
+    );
+    const categoryTotals = expenseTransactions.reduce(
+      (acc: any, transaction) => {
+        const categoryId = transaction.categories_id;
+        if (categoryId && !acc[categoryId]) {
+          acc[categoryId] = {
+            total: 0,
+            name: transaction.categories?.name,
+            color: transaction.categories?.color,
+          };
+        }
+        if (categoryId) {
+          acc[categoryId].total += transaction.amount;
+        }
+        return acc;
+      },
+      {}
+    );
 
     // 가장 많이 지출한 카테고리 찾기
     const topCategory = Object.entries(categoryTotals).reduce(
@@ -66,19 +79,28 @@ export async function GET(request: Request) {
       null
     );
 
+    // 수입과 지출 총액 계산
+    const expenseTotal = expenseTransactions.reduce(
+      (sum: number, t: any) => sum + t.amount,
+      0
+    );
+
+    const incomeTotal = transactions
+      .filter((t) => t.type === "income")
+      .reduce((sum: number, t: any) => sum + t.amount, 0);
+
     return NextResponse.json({
-      expenses,
+      transactions,
       categoryTotals,
       topCategory,
-      total: expenses.reduce(
-        (sum: number, expense: any) => sum + expense.amount,
-        0
-      ),
+      expenseTotal,
+      incomeTotal,
+      balance: incomeTotal - expenseTotal,
     });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { error: "Failed to fetch expenses" },
+      { error: "Failed to fetch transactions" },
       { status: 500 }
     );
   }
@@ -93,26 +115,29 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { data: expense, error } = await supabaseAdmin
-      .from("expenses")
+    const { data: transaction, error } = await supabaseAdmin
+      .from("transactions")
       .insert([
         {
           amount: body.amount,
-          categories_id: body.categories_id,
+          categories_id: body.type === "expense" ? body.categories_id : null,
           description: body.description,
           created_at: new Date(),
-          expense_date: body.expense_date || new Date(),
+          transaction_date: body.transaction_date || new Date(),
           user_id: session.user.id,
+          type: body.type, // 'expense' 또는 'income'
         },
       ])
       .select()
       .single();
 
+    console.log(transaction, error);
+
     if (error) throw error;
-    return NextResponse.json(expense);
+    return NextResponse.json(transaction);
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to create expense" },
+      { error: "Failed to create transaction" },
       { status: 500 }
     );
   }
@@ -131,22 +156,22 @@ export async function PUT(request: Request) {
     // 필수 필드 검증
     if (!body.id) {
       return NextResponse.json(
-        { error: "Expense ID is required" },
+        { error: "Transaction ID is required" },
         { status: 400 }
       );
     }
 
-    // 해당 지출이 현재 사용자의 것인지 확인
-    const { data: existingExpense, error: fetchError } = await supabaseAdmin
-      .from("expenses")
+    // 해당 거래가 현재 사용자의 것인지 확인
+    const { data: existingTransaction, error: fetchError } = await supabaseAdmin
+      .from("transactions")
       .select()
       .eq("id", body.id)
       .eq("user_id", session.user.id)
       .single();
 
-    if (fetchError || !existingExpense) {
+    if (fetchError || !existingTransaction) {
       return NextResponse.json(
-        { error: "Expense not found or unauthorized" },
+        { error: "Transaction not found or unauthorized" },
         { status: 404 }
       );
     }
@@ -155,12 +180,13 @@ export async function PUT(request: Request) {
     const updateData = {
       amount: body.amount,
       description: body.description,
-      categories_id: body.categories_id,
-      expense_date: body.expense_date,
+      categories_id: body.type === "expense" ? body.categories_id : null,
+      transaction_date: body.transaction_date,
+      type: body.type,
     };
 
-    const { data: expense, error } = await supabaseAdmin
-      .from("expenses")
+    const { data: transaction, error } = await supabaseAdmin
+      .from("transactions")
       .update(updateData)
       .eq("id", body.id)
       .select(
@@ -175,11 +201,11 @@ export async function PUT(request: Request) {
       throw error;
     }
 
-    return NextResponse.json(expense);
+    return NextResponse.json(transaction);
   } catch (error) {
-    console.error("Error updating expense:", error);
+    console.error("Error updating transaction:", error);
     return NextResponse.json(
-      { error: "Failed to update expense" },
+      { error: "Failed to update transaction" },
       { status: 500 }
     );
   }
@@ -198,29 +224,29 @@ export async function DELETE(request: Request) {
 
     if (!id) {
       return NextResponse.json(
-        { error: "Expense ID is required" },
+        { error: "Transaction ID is required" },
         { status: 400 }
       );
     }
 
-    // 해당 지출이 현재 사용자의 것인지 확인
-    const { data: existingExpense, error: fetchError } = await supabaseAdmin
-      .from("expenses")
+    // 해당 거래가 현재 사용자의 것인지 확인
+    const { data: existingTransaction, error: fetchError } = await supabaseAdmin
+      .from("transactions")
       .select()
       .eq("id", id)
       .eq("user_id", session.user.id)
       .single();
 
-    if (fetchError || !existingExpense) {
+    if (fetchError || !existingTransaction) {
       return NextResponse.json(
-        { error: "Expense not found or unauthorized" },
+        { error: "Transaction not found or unauthorized" },
         { status: 404 }
       );
     }
 
-    // 지출 삭제 실행
+    // 거래 삭제 실행
     const { error } = await supabaseAdmin
-      .from("expenses")
+      .from("transactions")
       .delete()
       .eq("id", id);
 
@@ -230,9 +256,9 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting expense:", error);
+    console.error("Error deleting transaction:", error);
     return NextResponse.json(
-      { error: "Failed to delete expense" },
+      { error: "Failed to delete transaction" },
       { status: 500 }
     );
   }

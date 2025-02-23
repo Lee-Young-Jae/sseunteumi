@@ -5,18 +5,9 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdminClient";
 
 interface KakaoProfile {
   id: number;
-  properties: {
-    nickname: string;
-    profile_image: string;
-    thumbnail_image: string;
-  };
-  kakao_account: {
-    profile: {
-      nickname: string;
-      profile_image_url: string;
-      thumbnail_image_url: string;
-    };
-  };
+  name: string;
+  email: string;
+  image: string;
 }
 
 // JWT 토큰 타입 확장
@@ -65,8 +56,8 @@ export const authOptions: NextAuthOptions = {
       if (account && profile) {
         const kakaoProfile = profile as KakaoProfile;
         token.accessToken = account.access_token;
-        token.profile_image = kakaoProfile.properties.profile_image;
-        token.thumbnail_image_url = kakaoProfile.properties.thumbnail_image;
+        token.profile_image = kakaoProfile.image;
+        token.thumbnail_image_url = kakaoProfile.image;
         token.id = String(kakaoProfile.id);
       }
       return token;
@@ -90,27 +81,62 @@ export const authOptions: NextAuthOptions = {
         const { data: existingUser } = await supabaseAdmin
           .from("users")
           .select("*")
-          .eq("id", String(kakaoProfile.id))
+          .eq("id", Number(kakaoProfile.id))
           .single();
 
-        // 이미지가 변경되었거나 새로운 유저인 경우 업데이트
-        if (
-          !existingUser ||
-          existingUser.image !== kakaoProfile.properties.profile_image
-        ) {
-          const { error } = await supabaseAdmin.from("users").upsert(
-            {
-              id: String(kakaoProfile.id),
-              name: kakaoProfile.properties.nickname,
-              image: kakaoProfile.properties.profile_image,
-            },
-            { onConflict: "id" }
-          );
+        // 새로운 유저인 경우
+        if (!existingUser) {
+          // 유저 정보 생성
+          const { error: userError } = await supabaseAdmin
+            .from("users")
+            .insert({
+              id: Number(kakaoProfile.id),
+              name: kakaoProfile.name,
+              image: kakaoProfile.image,
+            });
+
+          if (userError) {
+            console.error("Error inserting user into Supabase:", userError);
+            return;
+          }
+
+          // 기본 카테고리 생성
+          const defaultCategories = [
+            { name: "식비", color: "#FF6B6B" },
+            { name: "교통", color: "#4ECDC4" },
+            { name: "주거", color: "#45B7D1" },
+            { name: "통신", color: "#96CEB4" },
+            { name: "의료", color: "#FFEEAD" },
+            { name: "교육", color: "#D4A5A5" },
+            { name: "여가", color: "#9B59B6" },
+            { name: "기타", color: "#95A5A6" },
+          ];
+
+          const categoriesWithUserId = defaultCategories.map((category) => ({
+            user_id: Number(kakaoProfile.id),
+            name: category.name,
+            color: category.color,
+          }));
+
+          const { error: categoryError } = await supabaseAdmin
+            .from("categories")
+            .insert(categoriesWithUserId);
+
+          if (categoryError) {
+            console.error(
+              "Error inserting categories into Supabase:",
+              categoryError
+            );
+          }
+        } else if (existingUser.image !== kakaoProfile.image) {
+          // 이미지가 변경된 경우에만 업데이트
+          const { error } = await supabaseAdmin
+            .from("users")
+            .update({ image: kakaoProfile.image })
+            .eq("id", String(kakaoProfile.id));
 
           if (error) {
-            console.error("Error upserting user into Supabase:", error);
-          } else {
-            console.log("User successfully upserted into Supabase");
+            console.error("Error updating user in Supabase:", error);
           }
         }
       } catch (err) {

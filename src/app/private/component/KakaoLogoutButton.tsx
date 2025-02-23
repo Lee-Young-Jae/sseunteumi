@@ -6,27 +6,22 @@ const KakaoLogoutButton = () => {
   const { data: session } = useSession();
 
   const handleLogout = async () => {
-    if (session?.user?.accessToken) {
-      try {
+    try {
+      if (session?.user?.accessToken) {
         const response = await fetch(`/api/auth/kakao-logout`);
         if (!response.ok) {
           console.error(response.statusText);
           return;
         }
-
-        await signOut({
-          redirect: true,
-          callbackUrl: "/",
-        });
-      } catch (error) {
-        console.error("서버 Kakao 로그아웃 API 호출 에러:", error);
       }
-    }
 
-    await signOut({
-      redirect: true,
-      callbackUrl: "/",
-    });
+      await signOut({
+        redirect: true,
+        callbackUrl: "/",
+      });
+    } catch (error) {
+      console.error("로그아웃 처리 중 에러 발생:", error);
+    }
   };
 
   return (
