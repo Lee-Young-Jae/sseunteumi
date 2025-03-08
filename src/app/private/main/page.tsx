@@ -40,10 +40,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, isToday } from "date-fns";
 import { ko } from "date-fns/locale";
 import {
-  useGetCategories,
   useCreateCategory,
   useUpdateCategory,
   useDeactivateCategory,
+  useGetCategories,
 } from "@/queries/useCategoryQuery";
 import { motion } from "framer-motion";
 import {
@@ -70,11 +70,10 @@ const formSchema = z.object({
 
 const MainPage = () => {
   const { data: session } = useSession();
-  const { data: categories = [], isLoading: isCategoriesLoading } =
-    useGetCategories();
 
-  const { data: transactionData, isLoading: isTransactionsLoading } =
-    useGetMonthlyTransactions();
+  const { data: categories } = useGetCategories();
+
+  const { data: transactionData } = useGetMonthlyTransactions();
 
   const createTransaction = useCreateTransaction();
   const createCategory = useCreateCategory();

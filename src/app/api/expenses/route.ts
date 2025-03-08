@@ -1,7 +1,22 @@
 import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdminClient";
+import { authOptions } from "../auth/auth";
+
+interface CategoryTotal {
+  total: number;
+  name: string;
+  color: string;
+}
+
+interface Expense {
+  amount: number;
+  categories_id: string;
+  categories: {
+    name: string;
+    color: string;
+  };
+}
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -46,22 +61,27 @@ export async function GET(request: Request) {
     if (error) throw error;
 
     // 카테고리별 총액 계산
-    const categoryTotals = expenses.reduce((acc: any, expense) => {
-      const categoryId = expense.categories_id;
-      if (!acc[categoryId]) {
-        acc[categoryId] = {
-          total: 0,
-          name: expense.categories?.name,
-          color: expense.categories?.color,
-        };
-      }
-      acc[categoryId].total += expense.amount;
-      return acc;
-    }, {});
+    const categoryTotals = expenses.reduce<Record<string, CategoryTotal>>(
+      (acc, expense: Expense) => {
+        const categoryId = expense.categories_id;
+        if (!acc[categoryId]) {
+          acc[categoryId] = {
+            total: 0,
+            name: expense.categories.name,
+            color: expense.categories.color,
+          };
+        }
+        acc[categoryId].total += expense.amount;
+        return acc;
+      },
+      {}
+    );
 
     // 가장 많이 지출한 카테고리 찾기
-    const topCategory = Object.entries(categoryTotals).reduce(
-      (max: any, [id, data]: any) =>
+    const topCategory = Object.entries(categoryTotals).reduce<
+      (CategoryTotal & { id: string }) | null
+    >(
+      (max, [id, data]) =>
         !max || data.total > max.total ? { id, ...data } : max,
       null
     );
@@ -71,7 +91,7 @@ export async function GET(request: Request) {
       categoryTotals,
       topCategory,
       total: expenses.reduce(
-        (sum: number, expense: any) => sum + expense.amount,
+        (sum: number, expense: Expense) => sum + expense.amount,
         0
       ),
     });
@@ -111,10 +131,7 @@ export async function POST(request: Request) {
     if (error) throw error;
     return NextResponse.json(expense);
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to create expense" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: `${error}` }, { status: 500 });
   }
 }
 

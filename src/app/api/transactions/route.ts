@@ -1,7 +1,8 @@
 import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authOptions } from "../auth/auth";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdminClient";
+import { Transaction, CategoryTotals } from "@/types/query";
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -55,13 +56,13 @@ export async function GET(request: Request) {
       (t) => t.type === "expense"
     );
     const categoryTotals = expenseTransactions.reduce(
-      (acc: any, transaction) => {
+      (acc: CategoryTotals, transaction: Transaction) => {
         const categoryId = transaction.categories_id;
         if (categoryId && !acc[categoryId]) {
           acc[categoryId] = {
             total: 0,
-            name: transaction.categories?.name,
-            color: transaction.categories?.color,
+            name: transaction.categories?.name || "",
+            color: transaction.categories?.color || "",
           };
         }
         if (categoryId) {
@@ -73,21 +74,28 @@ export async function GET(request: Request) {
     );
 
     // 가장 많이 지출한 카테고리 찾기
-    const topCategory = Object.entries(categoryTotals).reduce(
-      (max: any, [id, data]: any) =>
+    const topCategory = Object.entries(
+      categoryTotals as CategoryTotals
+    ).reduce<{
+      id: string;
+      total: number;
+      name: string;
+      color: string;
+    } | null>(
+      (max, [id, data]) =>
         !max || data.total > max.total ? { id, ...data } : max,
       null
     );
 
     // 수입과 지출 총액 계산
     const expenseTotal = expenseTransactions.reduce(
-      (sum: number, t: any) => sum + t.amount,
+      (sum: number, t: Transaction) => sum + t.amount,
       0
     );
 
     const incomeTotal = transactions
       .filter((t) => t.type === "income")
-      .reduce((sum: number, t: any) => sum + t.amount, 0);
+      .reduce((sum: number, t: Transaction) => sum + t.amount, 0);
 
     return NextResponse.json({
       transactions,
@@ -137,7 +145,7 @@ export async function POST(request: Request) {
     return NextResponse.json(transaction);
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to create transaction" },
+      { error: "Failed to create transaction" + error },
       { status: 500 }
     );
   }

@@ -1,4 +1,4 @@
-import { startOfMonth, endOfMonth, eachDayOfInterval, getDate } from "date-fns";
+import { startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 
 export const convertToLocalDate = (dateString: string) => {
   const date = new Date(dateString);

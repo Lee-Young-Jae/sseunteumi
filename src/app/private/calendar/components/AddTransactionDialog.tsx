@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Category } from "@/types/query";
 
 interface AddTransactionDialogProps {
   isOpen: boolean;
@@ -178,7 +179,7 @@ export function AddTransactionDialog({
                         <SelectValue placeholder="카테고리 선택" />
                       </SelectTrigger>
                       <SelectContent className="rounded-2xl">
-                        {categories.map((category: any) => (
+                        {categories.map((category: Category) => (
                           <SelectItem
                             key={category.id}
                             value={category.id}

@@ -13,9 +13,7 @@ import {
   useGetMonthlyTransactions,
   useDeleteTransaction,
   useUpdateTransaction,
-  useCreateTransaction,
 } from "@/queries/useTransactionQuery";
-import { useGetCategories } from "@/queries/useCategoryQuery";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,15 +37,14 @@ export default function CalendarPage() {
     selectedDate.getMonth() + 1
   );
   const { mutate: deleteTransaction } = useDeleteTransaction();
-  const [editingTransaction, setEditingTransaction] = useState<any>(null);
+  const [editingTransaction, setEditingTransaction] =
+    useState<Transaction | null>(null);
   const { mutate: updateTransaction } = useUpdateTransaction();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(
     null
   );
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const { data: categories = [] } = useGetCategories();
-  const { mutate: createTransaction } = useCreateTransaction();
 
   // 불러온 거래 데이터를 날짜별로 그룹화
   const transactionsByDay = data?.transactions.reduce((acc, transaction) => {
@@ -150,9 +147,6 @@ export default function CalendarPage() {
   // 새로운 핸들러 추가
   const handleAddClick = () => {
     if (selectedDay) {
-      const formattedDate = `${selectedDate.getFullYear()}-${String(
-        selectedDate.getMonth() + 1
-      ).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`;
       setIsAddDialogOpen(true);
     }
   };

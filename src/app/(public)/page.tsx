@@ -1,4 +1,3 @@
-import Link from "next/link";
 import KakaoLoginButton from "./component/KakaoLoginButton";
 
 export default function LandingPage() {

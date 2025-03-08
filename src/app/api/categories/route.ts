@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdminClient";
+import { authOptions } from "../auth/auth";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     return NextResponse.json(category);
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to create category" },
+      { error: "Failed to create category" + error },
       { status: 500 }
     );
   }
@@ -86,7 +86,7 @@ export async function PUT(request: Request) {
     return NextResponse.json(category);
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to update category" },
+      { error: "Failed to update category" + error },
       { status: 500 }
     );
   }
@@ -102,7 +102,7 @@ export async function PATCH(request: Request) {
   try {
     const { id } = await request.json();
 
-    const { data, error } = await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from("categories")
       .update({ is_active: false })
       .eq("id", id)
@@ -112,7 +112,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(
-      { error: "카테고리 비활성화 실패" },
+      { error: "카테고리 비활성화 실패" + error },
       { status: 500 }
     );
   }

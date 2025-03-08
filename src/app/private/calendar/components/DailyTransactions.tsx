@@ -1,4 +1,4 @@
-import { Transaction } from "@/types/query";
+import { Category, CategoryGroup, Transaction } from "@/types/query";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,7 @@ export function DailyTransactions({
         const categoryId = transaction.categories?.id || "uncategorized";
         if (!acc[categoryId]) {
           acc[categoryId] = {
-            category: transaction.categories,
+            category: transaction.categories as Category,
             transactions: [],
             total: 0,
           };
@@ -59,7 +59,7 @@ export function DailyTransactions({
         acc[categoryId].transactions.push(transaction);
         acc[categoryId].total += transaction.amount;
         return acc;
-      }, {} as Record<string, any>)
+      }, {} as Record<string, CategoryGroup>)
   );
 
   // 수입 항목 필터링

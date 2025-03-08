@@ -58,6 +58,7 @@ export function useExpenseManagement(initialDate: Date) {
     setSelectedDay,
     setEditingTransaction,
     setIsDeleteDialogOpen,
+    updateTransaction,
     setIsAddDialogOpen,
     handleDayClick,
     handleEditTransaction,

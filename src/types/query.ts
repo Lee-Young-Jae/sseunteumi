@@ -50,3 +50,11 @@ export interface CategoryGroup {
   transactions: Transaction[];
   total: number;
 }
+
+export interface CategoryTotals {
+  [key: string]: {
+    total: number;
+    name: string;
+    color: string;
+  };
+}
