@@ -15,13 +15,14 @@ import {
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { IoChevronBack, IoChevronForward } from "react-icons/io5";
+import { CategoryTotals, Transaction } from "@/types/query";
 
 interface MonthlyData {
-  transactions: any[];
+  transactions: Transaction[];
   expenseTotal: number;
   incomeTotal: number;
   balance: number;
-  categoryTotals: Record<string, any>;
+  categoryTotals: CategoryTotals;
 }
 
 export default function StatisticsPage() {
@@ -31,6 +32,8 @@ export default function StatisticsPage() {
   );
   const [previousMonthData, setPreviousMonthData] =
     useState<MonthlyData | null>(null);
+
+  console.log(previousMonthData);
 
   const fetchMonthData = async (date: Date) => {
     const response = await fetch(
@@ -181,7 +184,7 @@ export default function StatisticsPage() {
           </h2>
           <div className="space-y-4">
             {Object.entries(currentMonthData.categoryTotals).map(
-              ([id, data]: [string, any]) => (
+              ([id, data]) => (
                 <div key={id} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div
