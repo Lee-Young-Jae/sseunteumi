@@ -86,6 +86,15 @@ export async function GET(request: Request) {
       null
     );
 
+    // 총액 계산 추가
+    const totalExpense = expenses.reduce((sum: number, expense: Expense) => {
+      return expense.amount < 0 ? sum + Math.abs(expense.amount) : sum;
+    }, 0);
+
+    const totalIncome = expenses.reduce((sum: number, expense: Expense) => {
+      return expense.amount > 0 ? sum + expense.amount : sum;
+    }, 0);
+
     return NextResponse.json({
       expenses,
       categoryTotals,
@@ -94,6 +103,8 @@ export async function GET(request: Request) {
         (sum: number, expense: Expense) => sum + expense.amount,
         0
       ),
+      totalExpense,
+      totalIncome,
     });
   } catch (error) {
     console.error(error);
